@@ -13,6 +13,9 @@ Md532=c4f4c7a0d03945b78e23d3aa4ce127dc #Md5 string for 32bit iso
 Dest=$HOME/liveubuntu #directory path for directing exctracted iso
 DESTMP=/tmp/liveubuntu/ #directory path for temporary mounting
 mountext_Check=false
+depend_Check=false
+getiso_Check=false
+
 
 #FUNCTIONS########################################################################
 
@@ -63,9 +66,10 @@ function quit() {
 
 #Get original iso:
 #1.Download 32 bit iso
-#2 Select the iso with a fileselect
+#2.Select the iso with a fileselect
 function getiso() {
 getiso_Check=false
+
 dialog --clear --backtitle 'SELECT ISO' --menu 'First of all, you need a 12.04 Ubuntu iso.\nSelect one from your disk or download it from the official site.' $hght $wdth 3 1 'Download Ubuntu 12.04 32bit' 2 'Download Ubuntu 12.04 64bit' 3 'Select an Ubuntu 12.04 iso file' 2> $tmp
 Answ=$(<$tmp)
 succDwn=false
@@ -91,9 +95,12 @@ case $Answ in
           ;;
        3) isopath=$HOME/Scaricati/ubuntu-12.04.3-desktop-amd64.iso
           dialog --backtitle 'SELECT ISO' --fselect $isopath  14 48  2> $tmp
-          isopath=$(<temp) 
+              if [ ! $? -eq 0 ]
+                 then quit 'getiso'
+              fi 
+          isopath=$(<$tmp)
           ;;
-       *) quit 'getiso'
+       *|0) quit 'getiso'
           ;;
    esac
 
@@ -139,8 +146,11 @@ esac
 mountext_Check=true
 }
 
+#Ask for confirmation and warns about changing root,
+#If yes change root
+#Else exit
 function changeroot() {
- dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom\n\nContinue?  " $hght $wdth
+dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom\n\nContinue?  " $hght $wdth
 case $? in
        0)      
           ;;
