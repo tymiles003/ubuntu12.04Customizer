@@ -5,7 +5,8 @@
 #SETTINGS########################################################################
 wdth=60 #default dialog width and height
 hght=20
-tmp=/tmp/answ #filepath for processing answers
+status=/tmp/status #filepath for keeping score of script current status(TODO implement resume if ended with ctrl-z)
+tmp=/tmp/answ #filepath for processing selections of the user
 UbuntuUrl64=http://releases.ubuntu.com/precise/ubuntu-12.04.3-desktop-amd64.iso #download link
 UbuntuUrl32=http://releases.ubuntu.com/precise/ubuntu-12.04.3-desktop-i386.iso
 Md564=e2da0d5ac2ab8bedaa246869e30deb71 #Md5 string for 64bit iso (http://releases.ubuntu.com/precise/MD5SUMS)
@@ -15,6 +16,7 @@ DESTMP=/tmp/liveubuntu/ #directory path for temporary mounting
 mountext_Check=false
 depend_Check=false
 getiso_Check=false
+changeroot_Check=false
 
 
 #FUNCTIONS########################################################################
@@ -40,15 +42,21 @@ depend_Check=true
 
 #Delete all unecessary files and unmount when script is ended at any stage
 function clean() {
-rm -f $tmp
+rm -rf $tmp
 
 if $mountext_Check
-then 
+ then 
   sudo umount "$DESTMP"
   sudo umount "$Dest/squashfs/"
 fi
 
-}
+if $changeroot_Check
+ then
+  umount /proc/
+  umount /sys/
+  exit
+fi  
+} 
 
 #Exit functions
 #Exit if 'yes' is selected
@@ -138,6 +146,8 @@ case $? in
             sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/
             echo "Extracting filesystem...please wait."
             sudo cp -a $Dest/squashfs/* $Dest/custom
+            sudo cp /etc/resolv.conf $Dest/custom/etc
+            sudo cp /etc/hosts $Dest/custom/etc
             echo "DONE"    
           ;;
        1|255) quit 'mountext'
@@ -150,13 +160,18 @@ mountext_Check=true
 #If yes change root
 #Else exit
 function changeroot() {
-dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom\n\nContinue?  " $hght $wdth
+changeroot_Check=false
+dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom.\nAll the commands that will be executed from now on will be executed inside this folder.\n\nContinue?  " $hght $wdth
 case $? in
-       0)      
+       0) sudo chroot $Dest/custom
+	  mount -t proc none /proc/
+	  mount -t sysfs none /sys/
+          export HOME=/root     
           ;;
        1|255) quit 'changeroot'
           ;;
 esac
+changeroot_Check=true
 }
 
 
