@@ -83,20 +83,20 @@ Answ=$(<$tmp)
 succDwn=false
 
 case $Answ in
-       1) wget "$UbuntuUrl32" 2> log #(TODO show progress )
+       1) wget --debug --tries 1 "$UbuntuUrl32"
           if ! test $? -eq 0
-            then dialog --aspect 7 --title "Error" --msgbox "Could not download iso.\n$( cat log )" 0 0
-           rm -f log
-          getiso
+            then dialog --aspect 7 --title "Error" --msgbox "Downloding the iso reported an Error.\nPlease check your internet connection." 0 0
+                 rm -f /ubuntu-12.04.3-desktop-i386.iso
+                 getiso
           fi 
           succDwn=true
           isopath=/ubuntu-12.04.3-desktop-i386.iso
           ;;
-       2) wget "$UbuntuUrl64" 2> log
+       2) wget --debug --tries 1 "$UbuntuUrl64"
           if ! test $? -eq 0
-            then dialog --aspect 7 --title "Error" --msgbox "Could not download iso.\n$( cat log )" 0 0
-           rm -f log
-          getiso
+            then dialog --aspect 7 --title "Error" --msgbox "Downloding the iso reported an Error.\nPlease check your internet connection." 0 0
+    		 rm -f /ubuntu-12.04.3-desktop-amd64.iso	      
+                 getiso
           fi 
           succDwn=true
           isopath=/ubuntu-12.04.3-desktop-amd64.iso
@@ -106,7 +106,7 @@ case $Answ in
               if [ ! $? -eq 0 ]
                  then quit 'getiso'
               fi 
-          isopath=$(<$tmp)
+          isopath=$(< $tmp)
           ;;
        *|0) quit 'getiso'
           ;;
@@ -115,7 +115,7 @@ case $Answ in
 getiso_Check=true
 }
 
-#Checks md5 for downloaded iso
+#Checks md5 for iso
 function checkiso() {
          if $succDwn
            then
@@ -123,10 +123,20 @@ function checkiso() {
               md5= $(md5sum $isopath)
               if test "$md5" -eq "$Md564" || test "$md5" -eq "$Md532"
                  then dialog --title "Error" --msgbox "Iso Checksum is incorrect. Please be sure the file was correctly downloaded" $hght $wdth
-                 getiso            
+                 getiso 
               fi 
+          else 
+              if ! [ -r $isopath ]
+                 then dialog --title "Error" --msgbox "$isopath\n\nis not a valid file or you don't have reading ownerships." $hght $wdth
+                 getiso             
+              fi
+              grep '[.]*\.iso$' $tmp 
+              if ! [ $? -eq 0 ]
+                 then dialog --title "Error" --msgbox "$isopath\n\nis not an iso file." $hght $wdth
+                 getiso  
+              fi
           fi
-}
+}             
 
 #Mount and extract iso
 function mountext() {
@@ -145,7 +155,7 @@ case $? in
             sudo modprobe squashfs
             sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/
             echo "Extracting filesystem...please wait."
-            sudo cp -a $Dest/squashfs/* $Dest/custom
+            sudo cp -a $Dest/custom $Dest/squashfs/* 
             sudo cp /etc/resolv.conf $Dest/custom/etc
             sudo cp /etc/hosts $Dest/custom/etc
             echo "DONE"    
@@ -188,5 +198,6 @@ getiso
 checkiso
 mountext
 changeroot 
+quit 'getiso'
 
 exit 0
