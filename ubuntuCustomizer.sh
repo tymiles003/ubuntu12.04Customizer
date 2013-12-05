@@ -13,9 +13,10 @@ Md564=e2da0d5ac2ab8bedaa246869e30deb71 #Md5 string for 64bit iso (http://release
 Md532=c4f4c7a0d03945b78e23d3aa4ce127dc #Md5 string for 32bit iso
 Dest=$HOME/liveubuntu #directory path for directing exctracted iso
 DESTMP=/tmp/liveubuntu/ #directory path for temporary mounting
-mountext_Check=false
+
 depend_Check=false
 getiso_Check=false
+mountext_Check=false
 changeroot_Check=false
 
 
@@ -40,9 +41,10 @@ fi
 depend_Check=true
 }
 
-#Delete all unecessary files and unmount when script is ended at any stage
+#Delete all unecessary files and unmount when script is ended and exit
 function clean() {
-rm -rf $tmp
+rm -f $tmp
+rm -f $status
 
 if $mountext_Check
  then 
@@ -55,21 +57,47 @@ if $changeroot_Check
   umount /proc/
   umount /sys/
   exit
-fi  
+  sudo rm -rf $Dest
+  
+fi 
+exit 0 
 } 
 
-#Exit functions
+#Exit function
 #Exit if 'yes' is selected
-#Redirect to stated parameter if 'no' is selcted
+#Redirect to stated parameter if 'no' is selected
 function quit() {
          dialog --backtitle 'EXIT' --title 'Are you sure, Dude?' --yesno 'Exit now?' $hght $wdth
           case $? in
-              0) clean
-                 exit 0   
+              0) exit 0   
               ;;
               1|255) $1
               ;;
           esac
+}
+
+#Welcome or resume execution according to status file
+function welcome() {
+[ ! -f $status ] && touch $status
+dialog --title 'Welcome' --msgbox 'Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember 		that this is a student work and uses root functionalities. The author does not take any responsability on unexpected behaviours!\n\n\nCheers 		and press ENTER to continue' $hght $wdth
+
+phases_Check=$( gawk '{ print $1 }' $status )
+echo "$phases_Check"
+  if test -n "$phases_Check"
+    then  
+      dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
+      if [ $? -eq 0 ]
+        then 
+  	for phaseDone in $phases_Check
+           do
+           start=$phaseDone
+           "$phaseDone"_Check=true
+ 	done
+        $start
+      else
+       rm -f $status
+     fi  
+  fi
 }
 
 #Get original iso:
@@ -85,7 +113,7 @@ succDwn=false
 case $Answ in
        1) wget --debug --tries 1 "$UbuntuUrl32"
           if ! test $? -eq 0
-            then dialog --aspect 7 --title "Error" --msgbox "Downloding the iso reported an Error.\nPlease check your internet connection." 0 0
+            then dialog --aspect 7 --title "Error" --msgbox "Downloding the iso reported an error.\nPlease check your internet connection." 0 0
                  rm -f /ubuntu-12.04.3-desktop-i386.iso
                  getiso
           fi 
@@ -94,7 +122,7 @@ case $Answ in
           ;;
        2) wget --debug --tries 1 "$UbuntuUrl64"
           if ! test $? -eq 0
-            then dialog --aspect 7 --title "Error" --msgbox "Downloding the iso reported an Error.\nPlease check your internet connection." 0 0
+            then dialog --aspect 7 --title "Error" --msgbox "Downloding the iso reported an error.\nPlease check your internet connection." 0 0
     		 rm -f /ubuntu-12.04.3-desktop-amd64.iso	      
                  getiso
           fi 
@@ -113,6 +141,7 @@ case $Answ in
    esac
 
 getiso_Check=true
+echo "getiso OK" >> $status
 }
 
 #Checks md5 for iso
@@ -130,7 +159,7 @@ function checkiso() {
                  then dialog --title "Error" --msgbox "$isopath\n\nis not a valid file or you don't have reading ownerships." $hght $wdth
                  getiso             
               fi
-              grep '[.]*\.iso$' $tmp 
+              grep -q '[.]*\.iso$' $tmp 
               if ! [ $? -eq 0 ]
                  then dialog --title "Error" --msgbox "$isopath\n\nis not an iso file." $hght $wdth
                  getiso  
@@ -154,8 +183,7 @@ case $? in
             echo "Mounting filesystem in $Dest/squashfs.."
             sudo modprobe squashfs
             sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/
-            echo "Extracting filesystem...please wait."
-            sudo cp -a $Dest/custom $Dest/squashfs/* 
+            echo "Extracting filesystem...please wait 3 minutes."
             sudo cp /etc/resolv.conf $Dest/custom/etc
             sudo cp /etc/hosts $Dest/custom/etc
             echo "DONE"    
@@ -164,6 +192,7 @@ case $? in
           ;;
 esac
 mountext_Check=true
+echo "mountext OK" >> $status
 }
 
 #Ask for confirmation and warns about changing root,
@@ -182,6 +211,7 @@ case $? in
           ;;
 esac
 changeroot_Check=true
+echo "changeroot OK" >> $status
 }
 
 
@@ -191,9 +221,7 @@ changeroot_Check=true
 instdep 'dialog'
 instdep 'squashfs-tools'
 
-#Welcome message 
-dialog --title 'Welcome' --msgbox 'Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember that this is a student work and uses root functionalities. The author does not take any responsability on unexpected behaviours!\n\n\nCheers and press ENTER to continue' $hght $wdth
-
+welcome
 getiso
 checkiso
 mountext
