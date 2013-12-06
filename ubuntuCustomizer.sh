@@ -82,21 +82,23 @@ function welcome() {
 dialog --title 'Welcome' --msgbox 'Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember 		that this is a student work and uses root functionalities. The author does not take any responsability on unexpected behaviours!\n\n\nCheers 		and press ENTER to continue' $hght $wdth
 
 phases_Check=$( gawk '{ print $1 }' $status )
-echo "$phases_Check"
   if test -n "$phases_Check"
-    then  
+    then 
+      for phaseDone in $phases_Check
+           do
+           start=$phaseDone
+           varname=$( echo "$phaseDone"_Check )
+           let "$varname"=true   #dinamically assign true state to correct boolean flag variable
+           echo "$getiso_Check"
+ 	done 
       dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
       if [ $? -eq 0 ]
         then 
-  	for phaseDone in $phases_Check
-           do
-           start=$phaseDone
-           "$phaseDone"_Check=true
- 	done
-        $start
-      else
-       rm -f $status
-     fi  
+        $start #branch to last undone phase
+       fi
+      rm -f $status
+      clean
+      welcome  
   fi
 }
 
@@ -141,7 +143,7 @@ case $Answ in
    esac
 
 getiso_Check=true
-echo "getiso OK" >> $status
+
 }
 
 #Checks md5 for iso
@@ -170,6 +172,7 @@ function checkiso() {
 #Mount and extract iso
 function mountext() {
 mountext_Check=false
+
 dialog --backtitle 'SETUP THE ENVIRONMENT' --title 'Mount Iso' --yesno "Now this script is going to mount the iso in:\n$DESTMP\nand extract the required folders in:\n$Dest\n\nStart now?" $hght $wdth
 case $? in
        0)   echo "Creating necessary directories.."
@@ -192,7 +195,6 @@ case $? in
           ;;
 esac
 mountext_Check=true
-echo "mountext OK" >> $status
 }
 
 #Ask for confirmation and warns about changing root,
@@ -205,13 +207,13 @@ case $? in
        0) sudo chroot $Dest/custom
 	  mount -t proc none /proc/
 	  mount -t sysfs none /sys/
+          Homeold=$HOME
           export HOME=/root     
           ;;
        1|255) quit 'changeroot'
           ;;
 esac
 changeroot_Check=true
-echo "changeroot OK" >> $status
 }
 
 
@@ -222,9 +224,12 @@ instdep 'dialog'
 instdep 'squashfs-tools'
 
 welcome
+echo "getiso" >> $status
 getiso
 checkiso
+echo "mountext" >> $status
 mountext
+echo "changeroot" >> $status
 changeroot 
 quit 'getiso'
 
