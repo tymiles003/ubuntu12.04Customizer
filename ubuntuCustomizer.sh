@@ -16,6 +16,8 @@ depend_Check=false
 getiso_Check=false
 mountext_Check=false
 changeroot_Check=false
+allowmultiverse_Check=false
+packgmenu_Check=false
 
 
 #FUNCTIONS########################################################################
@@ -134,7 +136,7 @@ getiso_Check=true
 
 #Checks for iso
 function checkiso() {
-   if ! [ -r $isopath ]
+   if ! [ -r "$isopath" ]
       then dialog --title "Error" --msgbox "$isopath\n\nis not a valid file or you don't have reading ownerships." $hght $wdth
          getiso             
     fi
@@ -146,53 +148,122 @@ function checkiso() {
      fi
 }             
 
+#Checks existence of a liveubuntu folder 
+function checkworkspace() {
+if [ -e $Dest/custom ] && [ -e $Dest/custom/etc/hosts ]
+  then dialog --title "Workspace found!" --yesno "There is already a /liveubuntu folder in your home directory, do you want to keep it and continue working with it?\n" $hght $wdth
+       case $? in
+                0) echo "changeroot" >> $status
+                   mountext_Check=true   
+                   changeroot
+                   ;;           
+		1) if [ mount | grep "$HOME/liveubuntu/squashfs" ]
+		      then sudo umount -fld $Dest/squashfs
+                   fi
+                   ;;
+		2|255) quit 'checkworkspace' ;;
+	esac
+
+fi 
+}
+
 #Mount and extract iso
 function mountext() {
 mountext_Check=false
 checkiso
+checkworkspace
 
-dialog --backtitle 'SETUP THE ENVIRONMENT' --title 'Mount Iso' --yesno "Now this script is going to mount the iso in:\n$DESTMP\nand extract the required folders in:\n$Dest\nOriginal iso is:\n$isopath\n\nStart now?" $hght $wdth
-case $? in
-       0)   echo "Creating necessary directories.."
-            [ ! -d $Dest ] && mkdir -p "$Dest" && mkdir -p "$Dest/cd" && mkdir -p "$Dest/squashfs"
-            [ ! -d $Dest/custom ] && mkdir -p "$Dest/custom"
-            [ ! -d $DESTMP ] && mkdir -p "$DESTMP"
-            echo "Mounting iso.."
-            sudo mount -o loop "$isopath" "$DESTMP"
-            echo "Copying extracted iso.."
-            rsync --exclude=/casper/filesystem.squashfs -a $DESTMP $Dest/cd
-            echo "Mounting filesystem in $Dest/squashfs.."
-            sudo modprobe squashfs
-            sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/
-            echo "Extracting filesystem...please wait 3 minutes."
-            sudo cp -a $Dest/squashfs/* $Dest/custom
-            sudo cp /etc/resolv.conf $Dest/custom/etc
-            sudo cp /etc/hosts $Dest/custom/etc
-            echo "DONE"   
-          ;;
-       1|255) quit 'mountext'
-          ;;
-esac
+if ! $mountext_Check
+then
+	dialog --backtitle 'SETUP THE ENVIRONMENT' --title 'Mount Iso' --yesno "Now this script is going to mount the iso in:\n$DESTMP\nand extract 		the required folders in:\n$Dest\nOriginal iso is:\n$isopath\n\nStart now?" $hght $wdth
+	case $? in
+       		0)echo "Creating necessary directories.."
+            	  [ ! -d $Dest ] && mkdir -p "$Dest" && mkdir -p "$Dest/cd" && mkdir -p "$Dest/squashfs"
+            	  [ ! -d $Dest/custom ] && mkdir -p "$Dest/custom"
+            	  [ ! -d $DESTMP ] && mkdir -p "$DESTMP"
+                  echo "Mounting iso.."
+            	  sudo mount -o loop "$isopath" "$DESTMP" > /dev/null
+                  echo "Copying extracted iso.."
+            	  rsync --exclude=/casper/filesystem.squashfs -a $DESTMP $Dest/cd
+            	  echo "Mounting filesystem in $Dest/squashfs.."
+             	  sudo modprobe squashfs
+            	  sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/ > /dev/null
+            	  echo "Extracting filesystem...please wait 3 minutes."
+            	  sudo cp -a $Dest/squashfs/* $Dest/custom
+            	  sudo cp /etc/resolv.conf $Dest/custom/etc/
+            	  sudo cp /etc/hosts $Dest/custom/etc/
+            	  echo "DONE";;
+       		1|255) quit 'mountext';;
+	esac
+fi
 mountext_Check=true
 }
 
 #Ask for confirmation and warns about changing root,
-#If yes change root
+#If yes change root and mount
 #Else exit
 function changeroot() {
 changeroot_Check=false
-dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom.\nAll the commands that will be executed from now on will be executed inside this folder.\n\nContinue?" $hght $wdth
+dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom.\nAll the commands that will be executed from now on will be executed inside this folder. Then you will be able to add/remove packages.\n\nContinue?" $hght $wdth
 case $? in
-       0) Homeold=$HOME
-          sudo chroot $Dest/custom
-	  mount -t proc none /proc/
-	  mount -t sysfs none /sys/ 
-          export HOME=/root     
+       0) sudo chroot $Dest/custom umount /proc/
+          sudo chroot $Dest/custom umount /sys/
+          sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
+	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null;;
+       1|255) quit 'changeroot';;
+esac
+
+changeroot_Check=true
+}
+
+#Ask to enable multiverse repository by rewriting th sources.list file
+function allowmultiverse() {
+allowmultiverse_Check=false
+
+dialog --title "Enable Multiverse Repositories" --yesno "Do you want to activate multiverse repositories?\nThis will allow you to install extra packages later." $hght $wdth
+case $? in
+	0) rm $Dest/custom/etc/apt/sources.list
+	   echo "deb http://us.archive.ubuntu.com/ubuntu/ precise main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list 
+  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list 
+           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-security main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-updates main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-security main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-updates main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+           echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+           echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
+           sudo chroot $Dest/custom apt-get update 
+           ;;
+	2|255) quit 'allowmultiverse' ;;
+esac
+
+allowmultiverse_Check=true
+}
+
+
+
+#Allow the user to select among different personalizations.
+function packgmenu() {
+packgmenu_Check=false
+dialog --backtitle 'CUSTOMIZE' --title "Choose an option" --menu "You can use the UP/DOWN arrow keys.\n
+Choose a task or end the customization." 30 $wdth 5 \
+1 "Add new repositories" \
+2 "Add new packages automatically" \
+3 "Add a package manually" \
+4 "Remove an existing package" \
+5 "Change default background" \
+6 "End customization" 2> $tmp 
+
+answ=$(< $tmp)
+case $answ in
+       1) sudo chroot $Dest/custom addrepo     
           ;;
-       1|255) quit 'changeroot'
+       0) quit 'packgmenu'
           ;;
 esac
-changeroot_Check=true
+
+packgmenu_Check=true
 }
 
 
@@ -209,7 +280,11 @@ echo $isopath > $isopath_save
 echo "mountext" >> $status
 mountext
 echo "changeroot" >> $status
-changeroot 
+changeroot
+echo "allowmultiverse" >> $status
+allowmultiverse
+echo "packgmenu" >> $status
+packgmenu
 quit 'getiso'
 
 exit 0
