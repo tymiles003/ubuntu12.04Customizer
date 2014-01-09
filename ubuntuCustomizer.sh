@@ -89,7 +89,7 @@ function quit() {
 #Welcome or resume execution according to status file
 function welcome() {
 [ ! -f $status ] && touch $status
-dialog --title 'Welcome' --msgbox 'Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember that this is a student work and uses root functionalities. The author does not take any responsability on unexpected behaviours!\n\n\nCheers and press ENTER to continue' $hght $wdth
+dialog --title 'Welcome' --msgbox "Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember that this is a student work and uses root functionalities.\nPlease make sure you have:\n-a working internet connection\n-at least 3gb of space in ${HOME}\nThe author does not take any responsability on unexpected behaviours!\n\n\nCheers and press ENTER to continue" $hght $wdth
 
 phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
 [ -f $isopath_save ] && isopath=$( < $isopath_save ) #load iso path if present in file
@@ -175,7 +175,7 @@ checkworkspace
 
 if ! $mountext_Check
 then
-	dialog --backtitle 'SETUP THE ENVIRONMENT' --title 'Mount Iso' --yesno "Now this script is going to mount the iso in:\n$DESTMP\nand extract 		the required folders in:\n$Dest\nOriginal iso is:\n$isopath\n\nStart now?" $hght $wdth
+	dialog --backtitle 'SETUP THE ENVIRONMENT' --title 'Mount Iso' --yesno "Now this script is going to mount the iso in:\n$DESTMP\nand extract the required folders in:\n$Dest\nOriginal iso is:\n$isopath\n\nThis process will require at least 3 minutes.\nStart now?" $hght $wdth
 	case $? in
        		0)echo "Creating necessary directories.."
             	  [ ! -d $Dest ] && mkdir -p "$Dest" && mkdir -p "$Dest/cd" && mkdir -p "$Dest/squashfs"
@@ -187,7 +187,10 @@ then
             	  rsync --exclude=/casper/filesystem.squashfs -a $DESTMP $Dest/cd
             	  echo "Mounting filesystem in $Dest/squashfs.."
              	  sudo modprobe squashfs
-            	  sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/ > /dev/null
+                   if [ mount | grep "$HOME/liveubuntu/squashfs" ]
+		      then sudo umount -fld $Dest/squashfs
+                   fi
+            	  sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/
             	  echo "Extracting filesystem...please wait 3 minutes."
             	  sudo cp -a $Dest/squashfs/* $Dest/custom
             	  sudo cp /etc/resolv.conf $Dest/custom/etc/
@@ -206,8 +209,9 @@ function changeroot() {
 changeroot_Check=false
 dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom.\nAll the commands that will be executed from now on will be executed inside this folder. Then you will be able to add/remove packages.\n\nContinue?" $hght $wdth
 case $? in
-       0) sudo chroot $Dest/custom umount /proc/
-          sudo chroot $Dest/custom umount /sys/
+       0)        
+	  sudo chroot $Dest/custom umount /proc/ > /dev/null
+          sudo chroot $Dest/custom umount /sys/ > /dev/null
           sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
 	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null;;
        1|255) quit 'changeroot';;
@@ -216,24 +220,24 @@ esac
 changeroot_Check=true
 }
 
-#Ask to enable multiverse repository by rewriting th sources.list file
+#Ask to enable multiverse repository by rewriting the sources.list file
 function allowmultiverse() {
 allowmultiverse_Check=false
 
 dialog --title "Enable Multiverse Repositories" --yesno "Do you want to activate multiverse repositories?\nThis will allow you to install extra packages later." $hght $wdth
 case $? in
-	0) rm $Dest/custom/etc/apt/sources.list
-	   echo "deb http://us.archive.ubuntu.com/ubuntu/ precise main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list 
-  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list 
-           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-security main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-updates main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-security main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-updates main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-           echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-           echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" >> $Dest/custom/etc/apt/sources.list
-           sudo chroot $Dest/custom apt-get update 
+	0) sudo rm -f $Dest/custom/etc/apt/sources.list		
+           echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+  	   echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-security main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+ 	  echo "deb http://us.archive.ubuntu.com/ubuntu/ precise main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list 
+  	  echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list 
+          echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-security main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+          echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-updates main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+          echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+  	  echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-updates main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+          echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+          echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
+          sudo chroot $Dest/custom apt-get update
            ;;
 	2|255) quit 'allowmultiverse' ;;
 esac
@@ -241,6 +245,23 @@ esac
 allowmultiverse_Check=true
 }
 
+function addrepo() {
+dialog --backtitle 'CUSTOMIZE' --title 'Add Repositories' --inputbox "Write the Url you want to add"  $hght $wdth 2> $tmp
+Url=$(< $tmp)
+   if [ awk '/^[http:\/\/]+([*.])+\.[a-z]{2,5}$/' $tmp ]
+     then
+     sudo chroot $Dest/custom apt-add-repository $Url
+		if test $? -ne 0
+		then
+		   dialog --title 'Error' --msgbox "The Url:\n$Url\nis not valid" $hght $wdth
+		else
+		   dialog --title 'Add Repositories' --msgbox "Repository Added!" $hght $wdth
+                fi
+    else
+        dialog --title "Error" --msgbox "$Url\nis not valid\nPlease insert a valid url" $hght $wdth
+fi
+packgmenu
+}
 
 
 #Allow the user to select among different personalizations.
@@ -257,7 +278,8 @@ Choose a task or end the customization." 30 $wdth 5 \
 
 answ=$(< $tmp)
 case $answ in
-       1) sudo chroot $Dest/custom addrepo     
+       1) addrepo 
+          sudo chroot $Dest/custom apt-get update > /dev/null    
           ;;
        0) quit 'packgmenu'
           ;;
@@ -279,8 +301,11 @@ getiso
 echo $isopath > $isopath_save
 echo "mountext" >> $status
 mountext
-echo "changeroot" >> $status
-changeroot
+if ! $changeroot_Check
+ then
+   echo "changeroot" >> $status
+   changeroot
+fi
 echo "allowmultiverse" >> $status
 allowmultiverse
 echo "packgmenu" >> $status
