@@ -232,7 +232,8 @@ case $? in
 esac
 
 allowmultiverse_Check=true
-
+echo "packgmenu" >> $status
+packgmenu
 }
 
 function addrepo() {
@@ -323,8 +324,7 @@ if ! $changeroot_Check
    
 fi
 
-echo "packgmenu" >> $status
-packgmenu
+
 quit 'getiso'
 
 exit 0
