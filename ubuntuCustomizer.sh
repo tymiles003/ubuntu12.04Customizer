@@ -205,6 +205,8 @@ case $? in
 esac
 
 changeroot_Check=true
+echo "allowmultiverse" >> $status
+allowmultiverse
 }
 
 #Ask to enable multiverse repository by rewriting the sources.list file
@@ -230,8 +232,7 @@ case $? in
 esac
 
 allowmultiverse_Check=true
-echo "allowmultiverse" >> $status
-allowmultiverse
+
 }
 
 function addrepo() {
