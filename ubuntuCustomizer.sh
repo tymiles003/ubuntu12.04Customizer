@@ -210,6 +210,7 @@ allowmultiverse
 }
 
 #Ask to enable multiverse repository by rewriting the sources.list file
+#By default there are no commented repositories in 12.04
 function allowmultiverse() {
 allowmultiverse_Check=false
 
@@ -238,7 +239,7 @@ packgmenu
 
 #Check correctness and add the repo
 function addrepo() {
-dialog --backtitle 'CUSTOMIZE' --title 'Add Repositories' --inputbox "Write the Url you want to add"  $hght $wdth 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title 'Add Repositories' --inputbox "Write the PPA you want to add"  $hght $wdth 2> $tmp
 Url=$(< $tmp)
      sudo chroot $Dest/custom apt-add-repository --yes $Url		
 		if test $? -ne 0
@@ -270,7 +271,7 @@ packgmenu
 }
 
 function maninstll() {
-dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file\nMake sure your internet connection is working" --fselect $HOME 14 48 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file\nMake sure your internet connection is working" --fselect $HOME/Scaricati 14 48 2> $tmp
 pckg=$(< $tmp)
     if test $? -eq 0
   	   then
@@ -291,7 +292,7 @@ dialog --backtitle 'CUSTOMIZE' --title "Remove Package automatically" --inputbox
 pckg=$(< $tmp)
     if test $? -eq 0
   	   then
-              sudo chroot $Dest/custom apt-get purge --assume-yes "$pckg"
+              sudo chroot $Dest/custom apt-get remove --purge --assume-yes "$pckg"
        			if test $? -ne 0
   	   		  then        		  
                             dialog --title 'Error' --msgbox "The $pckg package failed removal\n" $hght $wdth                      
@@ -359,10 +360,9 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
            packgmenu) packgmenu;;
 	 esac  
        fi
-      clean
-      welcome		
+      clean	
   fi
-
+welcome
 
 
 exit 0
