@@ -302,10 +302,6 @@ pckg=$(< $tmp)
 packgmenu 
 }
 
-function changewall() {
-
-}
-
 #Allow the user to select among different personalizations.
 function packgmenu() {
 packgmenu_Check=false
