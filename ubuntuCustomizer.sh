@@ -96,7 +96,7 @@ getiso_Check=false
 
 dialog --clear --backtitle 'SELECT ISO' --msgbox 'First of all, you need a 12.04 Ubuntu iso.\nSelect an Ubuntu 12.04 iso file' $hght $wdth 2> $tmp
 case $? in
-       0) isopath=$HOME/Scaricati/ubuntu-12.04.3-desktop-amd64.iso #default possible iso path
+       0) isopath=$HOME/ #default possible iso path
           dialog --backtitle 'SELECT ISO' --fselect $isopath  14 48  2> $tmp
               if [ ! $? -eq 0 ]
                  then quit 'getiso'
@@ -252,6 +252,7 @@ Url=$(< $tmp)
 		if test $? -ne 0
  		  then
 		   dialog --title 'Error' --msgbox "The Url:\n$Url\nis not valid" $hght $wdth
+		   packgmenu
 		else
 		   dialog --title 'Add Repository' --msgbox "Repository Added!" $hght $wdth
                    echo "Updating Apt...."
@@ -269,7 +270,8 @@ pckg=$(< $tmp)
               sudo chroot $Dest/custom apt-get install --assume-yes "$pckg"
        			if test $? -ne 0
   	   		  then        		  
-                            dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth                      
+                            dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth
+			    packgmenu                      
        			else
              		    dialog --title 'Done' --infobox "$pckg successfully installed!" $hght $wdth; sleep 3
        			fi
@@ -281,17 +283,22 @@ packgmenu
 function maninstll() {
 dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file\nUse TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/Scaricati 14 48 2> $tmp
 pckg=$(< $tmp)
+printf "$pckg" | grep --silent '[.]*\.deb$'
     if test $? -eq 0
   	   then
-              sudo chroot $Dest/custom dpkg -i "$pckg"
+	      cp $pckg $Dest
+              sudo chroot $Dest/custom dpkg -i $Dest/$(basename "$pckg")
        			if test $? -ne 0
   	   		  then        		  
-                            dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth                      
+                            dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth
+	                    packgmenu                      
        			else
 			    dialog --title 'Done' --infobox "$pckg successfully installed!\nNow dependecies will be fixed" $hght $wdth; sleep 3
+			    sudo rm -f $Dest/$(basename "$pckg")
 		            sudo chroot $Dest/custom apt-get install -f
-             		    
        			fi
+    else 
+	dialog --title 'Error' --msgbox "The $pckg is not a valid .deb file" $hght $wdth
     fi
 packgmenu 
 }
@@ -305,7 +312,8 @@ pckg=$(< $tmp)
               sudo chroot $Dest/custom apt-get remove --purge --assume-yes "$pckg"
        			if test $? -ne 0
   	   		  then        		  
-                            dialog --title 'Error' --msgbox "The $pckg package failed removal\n" $hght $wdth                      
+                            dialog --title 'Error' --msgbox "The $pckg package failed removal\n" $hght $wdth
+			    packgmenu                      
        			else
              		    dialog --title 'Done' --infobox "$pckg successfully removed!" $hght $wdth; sleep 3
        			fi
@@ -315,7 +323,7 @@ packgmenu
 
 #Change default background
 function changeback() {
- dialog --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME 20 60 2> $tmp
+ dialog --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/ 20 50 2> $tmp
  imgpath=$(< $tmp)
     if [ -f "$imgpath" ]
     then
@@ -348,7 +356,7 @@ packgmenu_Check=true
 
 
 #SCRIPT########################################################################
-#Program flow executing above procedures (TODO implement check stages/sum up during execution)
+#Program flow executing above procedures, if a status file is found, resume execution.
 
 instdep 'dialog'
 instdep 'squashfs-tools'
