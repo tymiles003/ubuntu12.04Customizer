@@ -254,6 +254,22 @@ fi
 packgmenu
 }
 
+#Remove package automatically
+function removepckg() {
+dialog --backtitle 'CUSTOMIZE' --title "Remove Package automatically" --inputbox "Enter a package name you want to remove." $hght $wdth 2> $tmp
+pckg=$(< $tmp)
+    if test $? -eq 0
+  	   then
+              sudo chroot $Dest/custom apt-get purge --assume-yes "$pckg"
+       			if test $? -ne 0
+  	   		  then        		  
+                            dialog --title 'Error' --msgbox "The $pckg package failed removal\n" $hght $wdth                      
+       			else
+             		    echo "$pckg successfully removed!"
+       			fi
+    fi
+packgmenu 
+}
 
 #Allow the user to select among different personalizations.
 function packgmenu() {
