@@ -284,7 +284,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
            do
            start=$phaseDone
            varname=$( echo "${phaseDone}"_Check )
-           eval "$varname=true" #dinamically assign true state to correct boolean flag variable
+           eval "$varname=true" #assign true state to correct boolean flag variable
  	done 
       eval "$varname=false" #last phase on file is not actually completed
       dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
