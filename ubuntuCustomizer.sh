@@ -290,7 +290,16 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
       dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
       if [ $? -eq 0 ]
         then 
-          $start #branch to last undone phase
+        case $start in  #branch to last undone phase
+           welcome) welcome;;
+	   getiso) getiso;;
+ 	   mountext) mountext;;
+	   changeroot) changeroot;;
+	   allowmultiverse) allowmultiverse;;
+           
+	 esac  
+
+
        fi
       clean
   fi
