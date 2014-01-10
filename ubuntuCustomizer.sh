@@ -42,27 +42,21 @@ depend_Check=true
 }
 
 #Delete all unecessary files and unmount when script is ended properly
-
 function clean() {
 rm -f $tmp
 rm -f $status
 rm -f $isopath_save
 
-#To implement next TODO
-: <<'END'
-if $mountext_Check
- then 
-  sudo umount "$DESTMP"
-  sudo umount "$Dest/squashfs/"
-fi
-
 if $changeroot_Check
  then
-  export HOME=$Homeold 
-  umount /proc/
-  umount /sys/
-  exit
+ sudo chroot $Dest/custom umount /dev/pts > /dev/null
+ sudo chroot $Dest/custom umount /proc/ > /dev/null
+ sudo chroot $Dest/custom umount /sys/ > /dev/null
+ sudo umount $Dest/custom/dev
 fi
+
+#To implement next TODO
+: <<'END'
 echo "Before exit files in $Dest, if present, will be deleted... Confirm? (y/n)\n"
  read Answ
    if test "$Answ" = "y"
@@ -142,7 +136,8 @@ if [ -e $Dest/custom ] && [ -e $Dest/custom/etc/hosts ]
                    mountext_Check=true   
                    changeroot
                    ;;           
-		1) if [ mount | grep "$HOME/liveubuntu/squashfs" ]
+		1) mount | grep --silent "$HOME/liveubuntu/squashfs"
+                   if [  $? -eq 0 ]
 		      then sudo umount -fld $Dest/squashfs
                    fi
                    ;;
@@ -172,7 +167,8 @@ then
             	  rsync --exclude=/casper/filesystem.squashfs -a $DESTMP $Dest/cd
             	  echo "Mounting filesystem in $Dest/squashfs.."
              	  sudo modprobe squashfs
-                   if [ mount | grep "$HOME/liveubuntu/squashfs" ]
+                  mount | grep "$HOME/liveubuntu/squashfs"
+		   if [  $? -eq 0 ]
 		      then sudo umount -fld $Dest/squashfs
                    fi
             	  sudo mount -t squashfs -o loop $DESTMP/casper/filesystem.squashfs $Dest/squashfs/
@@ -180,6 +176,10 @@ then
             	  sudo cp -a $Dest/squashfs/* $Dest/custom
             	  sudo cp /etc/resolv.conf $Dest/custom/etc/
             	  sudo cp /etc/hosts $Dest/custom/etc/
+
+		  sudo umount -fld $Dest/squashfs
+                  sudo umount $DESTMP
+                  sudo rm -fr $DESTMP
             	  echo "DONE";;
        		1|255) quit 'mountext';;
 	esac
@@ -196,11 +196,18 @@ function changeroot() {
 changeroot_Check=false
 dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom.\nAll the commands that will be executed from now on will be executed inside this folder. Then you will be able to add/remove packages.\n\nContinue?" $hght $wdth
 case $? in
-       0)        
-	  sudo chroot $Dest/custom umount /proc/ > /dev/null
+       0) mount | grep --silent "$Dest/custom/dev"
+	   if [ $? -eq 0 ]
+             then
+          sudo chroot $Dest/custom umount /dev/pts > /dev/null
+          sudo chroot $Dest/custom umount /proc/ > /dev/null
           sudo chroot $Dest/custom umount /sys/ > /dev/null
+          sudo umount $Dest/custom/dev
+           fi
+	  sudo chroot $Dest/custom mount -t devpts none /dev/pts
           sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
-	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null;;
+	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null
+	  sudo mount --bind /dev/ $Dest/custom/dev;;
        1|255) quit 'changeroot';;
 esac
 
@@ -264,23 +271,26 @@ pckg=$(< $tmp)
   	   		  then        		  
                             dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth                      
        			else
-             		    echo "$pckg successfully Installed"
+             		    dialog --title 'Done' --infobox "$pckg successfully installed!" $hght $wdth; sleep 3
        			fi
     fi
 packgmenu 
 }
 
+#Select a .deb file and install it wih dependecies
 function maninstll() {
-dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file\nMake sure your internet connection is working" --fselect $HOME/Scaricati 14 48 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file\nUse TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/Scaricati 14 48 2> $tmp
 pckg=$(< $tmp)
     if test $? -eq 0
   	   then
-              sudo chroot $Dest/custom gdebi --assume-yes "$pckg"
+              sudo chroot $Dest/custom dpkg -i "$pckg"
        			if test $? -ne 0
   	   		  then        		  
                             dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth                      
        			else
-             		    echo "$pckg successfully Installed"
+			    dialog --title 'Done' --infobox "$pckg successfully installed!\nNow dependecies will be fixed" $hght $wdth; sleep 3
+		            sudo chroot $Dest/custom apt-get install -f
+             		    
        			fi
     fi
 packgmenu 
@@ -297,33 +307,40 @@ pckg=$(< $tmp)
   	   		  then        		  
                             dialog --title 'Error' --msgbox "The $pckg package failed removal\n" $hght $wdth                      
        			else
-             		    echo "$pckg successfully removed!"
+             		    dialog --title 'Done' --infobox "$pckg successfully removed!" $hght $wdth; sleep 3
        			fi
     fi
 packgmenu 
 }
 
+#Change default background
+function changeback() {
+ dialog --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME 20 60 2> $tmp
+ imgpath=$(< $tmp)
+    if [ -f "$imgpath" ]
+    then
+      img=$(basename "$imgpath")
+     cp $imgpath $Dest/custom/usr/share/backgrounds
+     sudo chroot $Dest/custom gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults --set -t string /desktop/gnome/background/picture_filename /usr/share/backgrounds/$img
+    else
+      dialog --title "Error" --msgbox "The file\n$imgpath\nis not a valid file." $hght $wdth
+    fi
+packgmenu
+}
+
 #Allow the user to select among different personalizations.
 function packgmenu() {
 packgmenu_Check=false
-dialog --backtitle 'CUSTOMIZE' --title "Choose an option" --menu "You can use the UP/DOWN arrow keys.\n
-Choose a task or end the customization." 30 $wdth 5 \
-1 "Add new repositories" \
-2 "Add new packages automatically" \
-3 "Add a package manually" \
-4 "Remove an installed package" \
-5 "Change default background" \
-6 "End customization" 2> $tmp 
-
+dialog --backtitle 'CUSTOMIZE' --title "Choose an option" --menu "You can use the UP/DOWN arrow keys.\nChoose a task or end the customization." 14 65 6 1 "Add new repositories" 2 "Add new packages automatically" 3 "Add a package manually (.deb file)" 4 "Remove an installed package" 5 "Change default background" 6 "End customization" 2> $tmp 
 answ=$(< $tmp)
+
 case $answ in
        1) addrepo;;
        2) autoinstll;;
        3) maninstll;;
        4) removepckg;;
-       5) ;;
-       6|255) quit 'packgmenu';;
-       0) quit 'packgmenu';;
+       5) changeback;;
+       *) quit 'packgmenu';;
 esac
 
 packgmenu_Check=true
@@ -336,6 +353,7 @@ packgmenu_Check=true
 instdep 'dialog'
 instdep 'squashfs-tools'
 
+#Resume and redirect according to status file
 phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
 [ -f $isopath_save ] && isopath=$( < $isopath_save ) #load iso path if present in file
 
