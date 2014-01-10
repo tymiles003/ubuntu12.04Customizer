@@ -52,7 +52,7 @@ if $changeroot_Check
  sudo chroot $Dest/custom umount /dev/pts > /dev/null
  sudo chroot $Dest/custom umount /proc/ > /dev/null
  sudo chroot $Dest/custom umount /sys/ > /dev/null
- sudo umount $Dest/custom/dev
+ sudo umount $Dest/custom/dev > /dev/null
 fi
 
 #To implement next TODO
@@ -71,7 +71,7 @@ END
 #Exit if 'yes' is selected
 #Redirect to stated parameter if 'no' is selected
 function quit() {
-         dialog --backtitle 'EXIT' --title 'Are you sure, Dude?' --yesno 'Exit now?' $hght $wdth
+         dialog --backtitle 'EXIT' --title 'Are you sure, Dude?' --yesno 'Exit now?\nYou will be able to resume execution from here' $hght $wdth
           case $? in
               0) exit 0   
               ;;
@@ -143,7 +143,6 @@ if [ -e $Dest/custom ] && [ -e $Dest/custom/etc/hosts ]
                    ;;
 		2|255) quit 'checkworkspace' ;;
 	esac
-
 fi 
 }
 
@@ -204,9 +203,10 @@ case $? in
           sudo chroot $Dest/custom umount /sys/ > /dev/null
           sudo umount $Dest/custom/dev
            fi
-	  sudo chroot $Dest/custom mount -t devpts none /dev/pts
+	  
           sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
 	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null
+ 	  sudo chroot $Dest/custom mount -t devpts none /dev/pts
 	  sudo mount --bind /dev/ $Dest/custom/dev;;
        1|255) quit 'changeroot';;
 esac
@@ -216,12 +216,34 @@ echo "allowmultiverse" >> $status
 allowmultiverse
 }
 
+#TODO
+: <<'END'
+#Check internet connection for next steps 
+function checketh() {
+pingok=true
+  while $pingok
+  do
+  nmap -sP 192.168.0.0-255
+    if ! test $? -eq 0 
+       then 
+	 dialog --title 'Error' --msgbox "Your internet connection is not working.\nPlease make sure you are connected before proceeding" $hght $wdth       
+           if ! test $? -eq 0 
+               then 
+		quit 'allowmultiverse'
+            fi
+    else pingok=false
+    fi 
+  done
+  
+}
+END
+
 #Ask to enable multiverse repository by rewriting the sources.list file
 #By default there are no commented repositories in 12.04
 function allowmultiverse() {
 allowmultiverse_Check=false
 
-dialog --title "Enable Multiverse Repositories" --yesno "Do you want to activate multiverse repositories?\nThis will allow you to install extra packages later." $hght $wdth
+dialog --title "Enable Multiverse Repositories" --yesno "Do you want to activate multiverse repositories?\nThis will allow you to install extra packages later.\nMake sure your internet connection is working." $hght $wdth
 case $? in
 	0) sudo rm -f $Dest/custom/etc/apt/sources.list		
            echo "deb http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
@@ -246,7 +268,7 @@ packgmenu
 
 #Check correctness and add the repo
 function addrepo() {
-dialog --backtitle 'CUSTOMIZE' --title 'Add Repositories' --inputbox "Write the PPA you want to add"  $hght $wdth 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title 'Add Repositories' --inputbox "Write the PPA you want to add.\nMake sure your internet connection is working."  $hght $wdth 2> $tmp
 Url=$(< $tmp)
      sudo chroot $Dest/custom apt-add-repository --yes $Url		
 		if test $? -ne 0
@@ -263,7 +285,7 @@ packgmenu
 
 #Add new package automatically
 function autoinstll() {
-dialog --backtitle 'CUSTOMIZE' --title "Install Package automatically" --inputbox "Enter a package name.\nMake Sure your internet connection is working and you have the required repositories." $hght $wdth 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title "Install Package automatically" --inputbox "Enter a package name.\nMake Sure your internet connection is working and you have added the required PPA, if necessary." $hght $wdth 2> $tmp
 pckg=$(< $tmp)
     if test $? -eq 0
   	   then
@@ -281,31 +303,31 @@ packgmenu
 
 #Select a .deb file and install it wih dependecies
 function maninstll() {
-dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file\nUse TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/Scaricati 14 48 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file" --fselect $HOME/Scaricati 14 48 2> $tmp
 pckg=$(< $tmp)
 printf "$pckg" | grep --silent '[.]*\.deb$'
     if test $? -eq 0
   	   then
-	      cp $pckg $Dest
-              sudo chroot $Dest/custom dpkg -i $Dest/$(basename "$pckg")
+	      cp $pckg $Dest/custom/tmp
+              sudo chroot $Dest/custom dpkg -i tmp/$(basename "$pckg")
+	      sudo chroot $Dest/custom apt-get install -f --assume-yes
        			if test $? -ne 0
   	   		  then        		  
                             dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth
 	                    packgmenu                      
        			else
-			    dialog --title 'Done' --infobox "$pckg successfully installed!\nNow dependecies will be fixed" $hght $wdth; sleep 3
-			    sudo rm -f $Dest/$(basename "$pckg")
-		            sudo chroot $Dest/custom apt-get install -f
+			    dialog --title 'Done' --infobox "$pckg successfully installed!\n" $hght $wdth; sleep 3	            
        			fi
     else 
-	dialog --title 'Error' --msgbox "The $pckg is not a valid .deb file" $hght $wdth
+	 dialog --title 'Error' --msgbox "$pckg is not a valid .deb file" $hght $wdth
     fi
+sudo rm -f $Dest/custom/tmp/$(basename "$pckg")
 packgmenu 
 }
 
 #Remove package automatically
 function removepckg() {
-dialog --backtitle 'CUSTOMIZE' --title "Remove Package automatically" --inputbox "Enter a package name you want to remove." $hght $wdth 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title "Remove package" --inputbox "Enter a package's name you want to remove." $hght $wdth 2> $tmp
 pckg=$(< $tmp)
     if test $? -eq 0
   	   then
@@ -316,20 +338,21 @@ pckg=$(< $tmp)
 			    packgmenu                      
        			else
              		    dialog --title 'Done' --infobox "$pckg successfully removed!" $hght $wdth; sleep 3
-       			fi
+       		fi
     fi
 packgmenu 
 }
 
 #Change default background
 function changeback() {
- dialog --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/ 20 50 2> $tmp
+ dialog --backtitle "CUSTOMIZE" --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/ 18 50 2> $tmp
  imgpath=$(< $tmp)
     if [ -f "$imgpath" ]
     then
       img=$(basename "$imgpath")
-     cp $imgpath $Dest/custom/usr/share/backgrounds
-     sudo chroot $Dest/custom gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults --set -t string /desktop/gnome/background/picture_filename /usr/share/backgrounds/$img
+     sudo cp $imgpath $Dest/custom/usr/share/backgrounds
+     sudo chroot $Dest/custom gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults --set -t string /desktop/gnome/background/$img /usr/share/backgrounds/$img
+      dialog --title "Background changed!" --msgbox "Background successfully changed with:\n$imgpath" $hght $wdth
     else
       dialog --title "Error" --msgbox "The file\n$imgpath\nis not a valid file." $hght $wdth
     fi
@@ -348,6 +371,7 @@ case $answ in
        3) maninstll;;
        4) removepckg;;
        5) changeback;;
+       6) clean && exit 0;; #later it will make the iso TODO
        *) quit 'packgmenu';;
 esac
 
@@ -360,6 +384,7 @@ packgmenu_Check=true
 
 instdep 'dialog'
 instdep 'squashfs-tools'
+instdep 'gawk'
 
 #Resume and redirect according to status file
 phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
@@ -374,7 +399,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
            eval "$varname=true" #assign true state to correct boolean flag variable
  	done 
       eval "$varname=false" #last phase on file is not actually completed
-      dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
+      dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\n-Yes to continue execution\n-No to restart script\nIf you choose no, you will not lose your progress in /liveubuntu, but you can restart the customization.' $hght $wdth
       if [ $? -eq 0 ]
         then 
         case $start in  #branch to last undone phase
