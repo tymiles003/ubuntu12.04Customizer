@@ -298,10 +298,9 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
 	   allowmultiverse) allowmultiverse;;
            packgmenu) packgmenu;;
 	 esac  
-
-
        fi
       clean
+      welcome		
   fi
 
 welcome
