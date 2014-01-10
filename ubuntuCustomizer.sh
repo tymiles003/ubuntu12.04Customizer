@@ -91,26 +91,6 @@ function welcome() {
 [ ! -f $status ] && touch $status
 dialog --title 'Welcome' --msgbox "Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember that this is a student work and uses root functionalities.\nPlease make sure you have:\n-a working internet connection\n-at least 3gb of space in ${HOME}\nThe author does not take any responsability on unexpected behaviours!\n\n\nCheers and press ENTER to continue" $hght $wdth
 
-phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
-[ -f $isopath_save ] && isopath=$( < $isopath_save ) #load iso path if present in file
-
-  if test -n "$phases_Check"
-    then 
-      for phaseDone in $phases_Check
-           do
-           start=$phaseDone
-           varname=$( echo "${phaseDone}"_Check )
-           eval "$varname=true" #dinamically assign true state to correct boolean flag variable
- 	done 
-      eval "$varname=false" #last phase on file is not actually completed
-      dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
-      if [ $? -eq 0 ]
-        then 
-          $start #branch to last undone phase
-       fi
-      clean
-      welcome  
-  fi
 }
 
 #Get original iso:
@@ -294,6 +274,26 @@ packgmenu_Check=true
 
 instdep 'dialog'
 instdep 'squashfs-tools'
+
+phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
+[ -f $isopath_save ] && isopath=$( < $isopath_save ) #load iso path if present in file
+
+  if test -n "$phases_Check"
+    then 
+      for phaseDone in $phases_Check
+           do
+           start=$phaseDone
+           varname=$( echo "${phaseDone}"_Check )
+           eval "$varname=true" #dinamically assign true state to correct boolean flag variable
+ 	done 
+      eval "$varname=false" #last phase on file is not actually completed
+      dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\nYes to continue execution\nNo to restart script\n' $hght $wdth
+      if [ $? -eq 0 ]
+        then 
+          $start #branch to last undone phase
+       fi
+      clean
+  fi
 
 welcome
 echo "getiso " >> $status
