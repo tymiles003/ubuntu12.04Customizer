@@ -314,17 +314,6 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
       welcome		
   fi
 
-welcome
 
-getiso
-
-mountext
-if ! $changeroot_Check
- then
-   
-fi
-
-
-quit 'getiso'
 
 exit 0
