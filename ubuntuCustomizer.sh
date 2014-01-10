@@ -92,6 +92,7 @@ function welcome() {
 dialog --title 'Welcome' --msgbox "Hello! This script will allow you to personalize your Ubuntu 12.04 iso installation.\nPlease remember that this is a student work and uses root functionalities.\nPlease make sure you have:\n-a working internet connection\n-at least 3gb of space in ${HOME}\nThe author does not take any responsability on unexpected behaviours!\n\n\nCheers and press ENTER to continue" $hght $wdth
 
 echo "getiso" >> $status
+getiso
 }
 
 #Get original iso:
