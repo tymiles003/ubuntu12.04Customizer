@@ -185,6 +185,8 @@ then
 	esac
 fi
 mountext_Check=true
+echo "changeroot" >> $status
+changeroot
 }
 
 #Ask for confirmation and warns about changing root,
@@ -315,8 +317,7 @@ getiso
 mountext
 if ! $changeroot_Check
  then
-   echo "changeroot" >> $status
-   changeroot
+   
 fi
 echo "allowmultiverse" >> $status
 allowmultiverse
