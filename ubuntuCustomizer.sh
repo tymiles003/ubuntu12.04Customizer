@@ -305,7 +305,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
   fi
 
 welcome
-echo "getiso " >> $status
+echo "getiso" >> $status
 getiso
 echo $isopath > $isopath_save
 echo "mountext" >> $status
