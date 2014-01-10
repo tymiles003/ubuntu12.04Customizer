@@ -114,6 +114,8 @@ case $? in
    esac
 
 getiso_Check=true
+echo $isopath > $isopath_save
+echo "mountext" >> $status
 }
 
 #Checks for iso
@@ -308,8 +310,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
 welcome
 
 getiso
-echo $isopath > $isopath_save
-echo "mountext" >> $status
+
 mountext
 if ! $changeroot_Check
  then
