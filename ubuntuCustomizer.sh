@@ -236,22 +236,37 @@ echo "packgmenu" >> $status
 packgmenu
 }
 
+#Check correctness and add the repo
 function addrepo() {
 dialog --backtitle 'CUSTOMIZE' --title 'Add Repositories' --inputbox "Write the Url you want to add"  $hght $wdth 2> $tmp
 Url=$(< $tmp)
-   if [ awk '/^[http:\/\/]+([*.])+\.[a-z]{2,5}$/' $tmp ]
-     then
-     sudo chroot $Dest/custom apt-add-repository $Url
+     sudo chroot $Dest/custom apt-add-repository --yes $Url		
 		if test $? -ne 0
-		then
+ 		  then
 		   dialog --title 'Error' --msgbox "The Url:\n$Url\nis not valid" $hght $wdth
 		else
-		   dialog --title 'Add Repositories' --msgbox "Repository Added!" $hght $wdth
+		   dialog --title 'Add Repository' --msgbox "Repository Added!" $hght $wdth
+                   echo "Updating Apt...."
+		   sudo chroot $Dest/custom apt-get update > /dev/null 
                 fi
-    else
-        dialog --title "Error" --msgbox "$Url\nis not valid\nPlease insert a valid url" $hght $wdth
-fi
 packgmenu
+}
+
+#Add new package automatically
+function autoinstll() {
+dialog --backtitle 'CUSTOMIZE' --title "Install Package automatically" --inputbox "Enter a package name.\nMake Sure your internet connection is working and you have the required repositories." $hght $wdth 2> $tmp
+pckg=$(< $tmp)
+    if test $? -eq 0
+  	   then
+              sudo chroot $Dest/custom apt-get install --assume-yes "$pckg"
+       			if test $? -ne 0
+  	   		  then        		  
+                            dialog --title 'Error' --msgbox "The $pckg package failed installation\n" $hght $wdth                      
+       			else
+             		    echo "$pckg successfully Installed"
+       			fi
+    fi
+packgmenu 
 }
 
 function maninstll() {
