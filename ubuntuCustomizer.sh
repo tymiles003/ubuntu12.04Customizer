@@ -116,6 +116,7 @@ case $? in
 getiso_Check=true
 echo $isopath > $isopath_save
 echo "mountext" >> $status
+mountext
 }
 
 #Checks for iso
