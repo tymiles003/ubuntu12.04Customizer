@@ -263,17 +263,19 @@ Choose a task or end the customization." 30 $wdth 5 \
 1 "Add new repositories" \
 2 "Add new packages automatically" \
 3 "Add a package manually" \
-4 "Remove an existing package" \
+4 "Remove an installed package" \
 5 "Change default background" \
 6 "End customization" 2> $tmp 
 
 answ=$(< $tmp)
 case $answ in
-       1) addrepo 
-          sudo chroot $Dest/custom apt-get update > /dev/null    
-          ;;
-       0) quit 'packgmenu'
-          ;;
+       1) addrepo;;
+       2) autoinstll;;
+       3) maninstll;;
+       4) removepckg;;
+       5) ;;
+       6|255) quit 'packgmenu';;
+       0) quit 'packgmenu';;
 esac
 
 packgmenu_Check=true
