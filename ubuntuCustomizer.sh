@@ -296,7 +296,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
  	   mountext) mountext;;
 	   changeroot) changeroot;;
 	   allowmultiverse) allowmultiverse;;
-           
+           packgmenu) packgmenu;;
 	 esac  
 
 
