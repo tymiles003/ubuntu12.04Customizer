@@ -18,6 +18,7 @@ mountext_Check=false
 changeroot_Check=false
 allowmultiverse_Check=false
 packgmenu_Check=false
+updatemenu_Check=false
 
 
 #FUNCTIONS########################################################################
@@ -359,6 +360,60 @@ function changeback() {
 packgmenu
 }
 
+#Upgrade the whole Ubuntu to latest distro
+function upgrade() {
+dialog --title "You sure?" --yesno "This process will download a new distribution and install it.\nIt will need a lot of time, do you want to continue?" $hght $wdth
+if test $? -ne 0
+	then updatemenu
+fi
+sudo chroot $Dest/custom apt-get update
+sudo chroot $Dest/custom apt-get --assume-yes upgrade
+sudo chroot $Dest/custom apt-get dist-upgrade
+sudo chroot $Dest/custom apt-get install update-manager-core
+sudo chroot $Dest/custom do-release-upgrade
+if test $? -ne 0
+then
+      dialog --infobox "The update process did not end as expected, please retry" $hght $wdth ; sleep 2
+else
+      dialog --infobox "Upgrade completed!" $hght $wdth ; sleep 2
+fi
+updatemenu
+}
+
+#Add new package automatically
+function upgradepckg() {
+dialog --backtitle 'CUSTOMIZE' --title "Install Package automatically" --inputbox "Enter a package name.\nMake Sure your internet connection is working and you have added the required PPA, if necessary." $hght $wdth 2> $tmp
+pckg=$(< $tmp)
+    if test $? -eq 0
+  	   then
+              sudo chroot $Dest/custom apt-get ugrade --assume-yes "$pckg"
+       			if test $? -ne 0
+  	   		  then        		  
+                            dialog --title 'Error' --msgbox "The $pckg package failed upgrade\n" $hght $wdth
+			    updatemenu                      
+       			else
+             		    dialog --title 'Done' --infobox "$pckg successfully upgraded!" $hght $wdth; sleep 3
+       			fi
+    fi
+updatemenu 
+}
+
+#Show the upgrade options menu
+function updatemenu() {
+updatemenu_Check=false
+dialog --backtitle 'UPGRADE' --title "Choose an option" --menu "You can use the UP/DOWN arrow keys.\nChoose a task or end the upgrade." 14 65 3 1 "Upgrade Ubuntu" 2 "Upgrade a package" 3 "End and make the Iso" 2> $tmp 
+answ=$(< $tmp)
+
+case $answ in
+       1) upgrade;;
+       2) upgradepckg;;
+       *) quit 'updatemenu';;
+esac
+
+echo "updatemenu" >> $status
+updatemenu_Check=true
+} 
+
 #Allow the user to select among different personalizations.
 function packgmenu() {
 packgmenu_Check=false
@@ -371,7 +426,8 @@ case $answ in
        3) maninstll;;
        4) removepckg;;
        5) changeback;;
-       6) clean && exit 0;; #later it will make the iso TODO
+       6) echo "updatemenu" >> $status
+          updatemenu;; 
        *) quit 'packgmenu';;
 esac
 
@@ -409,6 +465,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
 	   changeroot) changeroot;;
 	   allowmultiverse) allowmultiverse;;
            packgmenu) packgmenu;;
+	   updatemenu) updatemenu;;
 	 esac  
        fi
       clean	
