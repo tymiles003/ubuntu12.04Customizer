@@ -66,6 +66,11 @@ echo "Before exit files in $Dest, if present, will be deleted... Confirm? (y/n)\
    fi
 END
 
+if $updatemenu_Check
+then 
+     sudo rm -fr $Dest
+fi
+
 } 
 
 #Exit function
@@ -207,8 +212,10 @@ case $? in
 	  
           sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
 	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null
- 	  sudo chroot $Dest/custom mount -t devpts none /dev/pts
-	  sudo mount --bind /dev/ $Dest/custom/dev;;
+ 	  sudo chroot $Dest/custom mount -t devpts none /dev/pts &&
+		                   export $HOME=/root
+	  sudo mount --bind /dev/ $Dest/custom/dev
+			;;
        1|255) quit 'changeroot';;
 esac
 
@@ -346,7 +353,7 @@ packgmenu
 
 #Change default background
 function changeback() {
- dialog --backtitle "CUSTOMIZE" --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/ 18 50 2> $tmp
+ dialog --backtitle "CUSTOMIZE" --title "Use TAB and arrows to move, and SPACE BAR to select" --fselect $HOME/ 14 48 2> $tmp
  imgpath=$(< $tmp)
     if [ -f "$imgpath" ]
     then
@@ -360,7 +367,7 @@ function changeback() {
 packgmenu
 }
 
-#Upgrade the whole Ubuntu to latest distro
+#Upgrade the whole Ubuntu iso to latest distro
 function upgrade() {
 dialog --title "You sure?" --yesno "This process will download a new distribution and install it.\nIt will need a lot of time, do you want to continue?" $hght $wdth
 if test $? -ne 0
@@ -380,13 +387,13 @@ fi
 updatemenu
 }
 
-#Add new package automatically
+#Update package automatically
 function upgradepckg() {
-dialog --backtitle 'CUSTOMIZE' --title "Install Package automatically" --inputbox "Enter a package name.\nMake Sure your internet connection is working and you have added the required PPA, if necessary." $hght $wdth 2> $tmp
-pckg=$(< $tmp)
+dialog --backtitle 'CUSTOMIZE' --title "Upgrade a Package automatically" --inputbox "Enter a package name.\nMake sure your internet connection is working and you have added the required PPA, if necessary." $hght $wdth 2> $tmp
     if test $? -eq 0
   	   then
-              sudo chroot $Dest/custom apt-get ugrade --assume-yes "$pckg"
+	      pckg=$(< $tmp)
+              sudo chroot $Dest/custom apt-get install --assume-yes "$pckg"
        			if test $? -ne 0
   	   		  then        		  
                             dialog --title 'Error' --msgbox "The $pckg package failed upgrade\n" $hght $wdth
@@ -398,6 +405,51 @@ pckg=$(< $tmp)
 updatemenu 
 }
 
+#Finalize and make the iso
+function finalize() {
+dialog --title 'Warning' --msgbox "This process will require some time to output the iso. Do you want to continue? " $hght $wdth
+ if test $? -ne 0
+  	   then updatemenu
+ fi
+
+dialog --backtitle 'FINALIZE' --title "Make the Iso" --inputbox "Enter the name of the new iso" $hght $wdth 2> $tmp
+
+if test $? -eq 0
+  	   then 
+		isoname=$(< $tmp)
+		echo "Cleaning up temp files and apt-get..."
+     		sudo chroot $Dest/custom sudo rm -f /etc/hosts /etc/resolv.conf
+		sudo chroot $Dest/custom apt-get clean
+		sudo chroot $Dest/custom umount /proc
+		sudo chroot $Dest/custom umount /sys
+		sudo umount $Dest/custom/dev
+		
+		echo "Generating manifest file..."
+		sudo chmod +w $Dest/cd/casper/filesystem.manifest
+		sudo chroot $Dest/custom dpkg-query -W --showformat='${Package} ${Version}\n' > $Dest/cd/casper/filesystem.manifest
+		sudo cp $Dest/cd/casper/filesystem.manifest $Dest/cd/casper/filesystem.manifest-desktop
+
+		echo "Regenerating the squashfs.."
+		sudo mksquashfs $Dest/custom $Dest/cd/casper/filesystem.squashfs
+		
+		echo "Updating Md5 sums..."
+		sudo rm $Dest/cd/md5sum.txt
+		cd $Dest/cd 
+	        sudo find . -type f -print0 | xargs -0 md5sum > md5sum.txt
+
+		echo "Creating actual iso file..."
+		mkisofs -r -V "Ubuntu-$isoname" -b $Dest/cd/isolinux/isolinux.bin -c $Dest/cd/isolinux/boot.cat -cache-inodes -J -l -no-emul-boot -boot-load-size 4 -boot-info-table -o $Dest/Ubuntu-$isoname.iso .
+
+		cp $Dest/Ubuntu-$isoname.iso $HOME/
+	        clean
+		dialog --title "Thank you" --msgbox "The script is ended, you will find the new iso in:\n $HOME/Ubuntu-$isoname.iso" $hght $wdth
+                exit 0
+
+else updatemenu
+fi
+
+}
+
 #Show the upgrade options menu
 function updatemenu() {
 updatemenu_Check=false
@@ -407,6 +459,7 @@ answ=$(< $tmp)
 case $answ in
        1) upgrade;;
        2) upgradepckg;;
+       3) finalize;;
        *) quit 'updatemenu';;
 esac
 
@@ -443,7 +496,7 @@ instdep 'squashfs-tools'
 instdep 'gawk'
 
 #Resume and redirect according to status file
-phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
+[ -f $status ] && phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
 [ -f $isopath_save ] && isopath=$( < $isopath_save ) #load iso path if present in file
 
   if test -n "$phases_Check"
@@ -455,7 +508,7 @@ phases_Check=$( gawk '{ print $1 }' $status ) #load completed phases
            eval "$varname=true" #assign true state to correct boolean flag variable
  	done 
       eval "$varname=false" #last phase on file is not actually completed
-      dialog --title 'Resume' --yesno 'Apparently, this script was already executed before. Would you like to resume execution?\n-Yes to continue execution\n-No to restart script\nIf you choose no, you will not lose your progress in /liveubuntu, but you can restart the customization.' $hght $wdth
+      dialog --title 'Resume' --yesno "Apparently, this script was already executed before. Would you like to resume execution?\n-Yes to continue execution\n-No to restart script\nIf you choose no, you will not lose your progress stored in $Dest, but you can restart the customization." $hght $wdth
       if [ $? -eq 0 ]
         then 
         case $start in  #branch to last undone phase
