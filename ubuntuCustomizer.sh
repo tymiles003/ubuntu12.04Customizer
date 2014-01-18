@@ -8,8 +8,8 @@ hght=20
 
 status=/tmp/status #filepath for keeping score of script current status
 tmp=/tmp/answ #filepath for processing selections of the user
-Dest=$HOME/liveubuntu #directory path for directing exctracted iso
-DESTMP=/tmp/liveubuntu/ #directory path for temporary mounting
+Dest=$HOME/liveubuntueciprian #directory path for directing exctracted iso
+DESTMP=/tmp/liveubuntueciprian/ #directory path for temporary mounting
 isopath_save=/tmp/isopath_save
 
 depend_Check=false
@@ -19,6 +19,7 @@ changeroot_Check=false
 allowmultiverse_Check=false
 packgmenu_Check=false
 updatemenu_Check=false
+finalize_Check=false
 
 
 #FUNCTIONS########################################################################
@@ -47,30 +48,16 @@ function clean() {
 rm -f $tmp
 rm -f $status
 rm -f $isopath_save
-
-if $changeroot_Check
- then
- sudo chroot $Dest/custom umount /dev/pts > /dev/null
- sudo chroot $Dest/custom umount /proc/ > /dev/null
- sudo chroot $Dest/custom umount /sys/ > /dev/null
- sudo umount $Dest/custom/dev > /dev/null
-fi
-
-#To implement next TODO
-: <<'END'
-echo "Before exit files in $Dest, if present, will be deleted... Confirm? (y/n)\n"
- read Answ
+		
+if $finalize_Check
+  then 
+  echo "Before exit files in $Dest, if present, will be deleted... Confirm? (y/n)\n"
+  read Answ
    if test "$Answ" = "y"
      then
        sudo rm -rf $Dest
    fi
-END
-
-if $updatemenu_Check
-then 
-     sudo rm -fr $Dest
 fi
-
 } 
 
 #Exit function
@@ -136,16 +123,21 @@ function checkiso() {
 #Checks existence of a liveubuntu folder 
 function checkworkspace() {
 if [ -e $Dest/custom ] && [ -e $Dest/custom/etc/hosts ]
-  then dialog --title "Workspace found!" --yesno "There is already a /liveubuntu folder in your home directory, do you want to keep it and continue working with it?\n" $hght $wdth
+  then dialog --title "Workspace found!" --yesno "There is already a /liveubuntueciprian folder in your home directory, do you want to keep it and continue working with it?\n" $hght $wdth
        case $? in
                 0) echo "changeroot" >> $status
                    mountext_Check=true   
                    changeroot
                    ;;           
-		1) mount | grep --silent "$HOME/liveubuntu/squashfs"
+		1) mount | grep --silent "$HOME/liveubuntueciprian/squashfs"
                    if [  $? -eq 0 ]
 		      then sudo umount -fld $Dest/squashfs
                    fi
+		   sudo chroot $Dest/custom umount /dev/pts/ > /dev/null
+ 		   sudo chroot $Dest/custom umount /proc/ > /dev/null
+ 		   sudo chroot $Dest/custom umount /sys/ > /dev/null
+ 		   sudo umount $Dest/custom/dev > /dev/null
+		   sudo rm -rf $Dest
                    ;;
 		2|255) quit 'checkworkspace' ;;
 	esac
@@ -172,7 +164,7 @@ then
             	  rsync --exclude=/casper/filesystem.squashfs -a $DESTMP $Dest/cd
             	  echo "Mounting filesystem in $Dest/squashfs.."
              	  sudo modprobe squashfs
-                  mount | grep "$HOME/liveubuntu/squashfs"
+                  mount | grep "$HOME/liveubuntueciprian/squashfs"
 		   if [  $? -eq 0 ]
 		      then sudo umount -fld $Dest/squashfs
                    fi
@@ -201,19 +193,9 @@ function changeroot() {
 changeroot_Check=false
 dialog --backtitle 'SETUP THE ENVIRONMENT' --title "Change Root" --yesno "Iso successfully extracted!\nNow the the root will be changed to\n$Dest/custom.\nAll the commands that will be executed from now on will be executed inside this folder. Then you will be able to add/remove packages.\n\nContinue?" $hght $wdth
 case $? in
-       0) mount | grep --silent "$Dest/custom/dev"
-	   if [ $? -eq 0 ]
-             then
-          sudo chroot $Dest/custom umount /dev/pts > /dev/null
-          sudo chroot $Dest/custom umount /proc/ > /dev/null
-          sudo chroot $Dest/custom umount /sys/ > /dev/null
-          sudo umount $Dest/custom/dev
-           fi
-	  
-          sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
+       0) sudo chroot $Dest/custom mount -t proc none /proc/ > /dev/null
 	  sudo chroot $Dest/custom mount -t sysfs none /sys/ > /dev/null
- 	  sudo chroot $Dest/custom mount -t devpts none /dev/pts &&
-		                   export $HOME=/root
+ 	  sudo chroot $Dest/custom mount -t devpts none /dev/pts > /dev/null
 	  sudo mount --bind /dev/ $Dest/custom/dev
 			;;
        1|255) quit 'changeroot';;
@@ -223,28 +205,6 @@ changeroot_Check=true
 echo "allowmultiverse" >> $status
 allowmultiverse
 }
-
-#TODO
-: <<'END'
-#Check internet connection for next steps 
-function checketh() {
-pingok=true
-  while $pingok
-  do
-  nmap -sP 192.168.0.0-255
-    if ! test $? -eq 0 
-       then 
-	 dialog --title 'Error' --msgbox "Your internet connection is not working.\nPlease make sure you are connected before proceeding" $hght $wdth       
-           if ! test $? -eq 0 
-               then 
-		quit 'allowmultiverse'
-            fi
-    else pingok=false
-    fi 
-  done
-  
-}
-END
 
 #Ask to enable multiverse repository by rewriting the sources.list file
 #By default there are no commented repositories in 12.04
@@ -265,6 +225,11 @@ case $? in
           echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-proposed main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
           echo "deb-src http://us.archive.ubuntu.com/ubuntu/ precise-backports main restricted universe multiverse" | sudo tee -a $Dest/custom/etc/apt/sources.list
           sudo chroot $Dest/custom apt-get update
+              if test  $? -ne 0
+		then
+		   dialog --title 'Error' --msgbox "The apt failed to update, maybe your internet connection is not working.\nTry again." $hght $wdth
+		   allowmultiverse
+	      fi
            ;;
 	2|255) quit 'allowmultiverse' ;;
 esac
@@ -309,9 +274,9 @@ pckg=$(< $tmp)
 packgmenu 
 }
 
-#Select a .deb file and install it wih dependecies
+#Select a .deb file and install it with dependecies
 function maninstll() {
-dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file" --fselect $HOME/Scaricati 14 48 2> $tmp
+dialog --backtitle 'CUSTOMIZE' --title "Select the .deb file" --fselect $HOME/ 14 48 2> $tmp
 pckg=$(< $tmp)
 printf "$pckg" | grep --silent '[.]*\.deb$'
     if test $? -eq 0
@@ -359,7 +324,7 @@ function changeback() {
     then
       img=$(basename "$imgpath")
      sudo cp $imgpath $Dest/custom/usr/share/backgrounds
-     sudo chroot $Dest/custom gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults --set -t string /desktop/gnome/background/$img /usr/share/backgrounds/$img
+     sudo chroot $Dest/custom gconftool-2 --direct --config-source xml:readwrite:/etc/gconf/gconf.xml.defaults --set -t string /desktop/gnome/background/picture_filename /usr/share/backgrounds/$img
       dialog --title "Background changed!" --msgbox "Background successfully changed with:\n$imgpath" $hght $wdth
     else
       dialog --title "Error" --msgbox "The file\n$imgpath\nis not a valid file." $hght $wdth
@@ -405,8 +370,26 @@ dialog --backtitle 'CUSTOMIZE' --title "Upgrade a Package automatically" --input
 updatemenu 
 }
 
+
+function makeiso(){
+echo "Creating actual iso file..."
+		cd $Dest/cd &&
+		sudo mkisofs -r -V "Ubuntu-$isoname" -b isolinux/isolinux.bin -c isolinux/boot.cat -cache-inodes -J -l -no-emul-boot -boot-load-size 4 -boot-info-table -o $HOME/Ubuntu-$isoname.iso .
+		if test  $? -ne 0
+		then
+		   dialog --title 'Error' --yesno "The creation of the iso failed.\nThe necessary files are still in your:\n$HOME/liveubuntu/cd.\nWould you try again?" $hght $wdth
+		   if test  $? -ne 0
+		      then
+ 		        exit -1
+		   else
+                        makeiso
+                   fi
+	      fi
+}
+
 #Finalize and make the iso
 function finalize() {
+finalize_Check=false
 dialog --title 'Warning' --msgbox "This process will require some time to output the iso. Do you want to continue? " $hght $wdth
  if test $? -ne 0
   	   then updatemenu
@@ -420,9 +403,11 @@ if test $? -eq 0
 		echo "Cleaning up temp files and apt-get..."
      		sudo chroot $Dest/custom sudo rm -f /etc/hosts /etc/resolv.conf
 		sudo chroot $Dest/custom apt-get clean
-		sudo chroot $Dest/custom umount /proc
-		sudo chroot $Dest/custom umount /sys
-		sudo umount $Dest/custom/dev
+		sudo chroot $Dest/custom umount /dev/pts/ > /dev/null
+ 		sudo chroot $Dest/custom umount /proc/ > /dev/null
+ 		sudo chroot $Dest/custom umount /sys/ > /dev/null
+ 		sudo umount $Dest/custom/dev > /dev/null
+		changeroot_Check=false
 		
 		echo "Generating manifest file..."
 		sudo chmod +w $Dest/cd/casper/filesystem.manifest
@@ -433,16 +418,14 @@ if test $? -eq 0
 		sudo mksquashfs $Dest/custom $Dest/cd/casper/filesystem.squashfs
 		
 		echo "Updating Md5 sums..."
-		sudo rm $Dest/cd/md5sum.txt
-		cd $Dest/cd 
-	        sudo find . -type f -print0 | xargs -0 md5sum > md5sum.txt
-
-		echo "Creating actual iso file..."
-		mkisofs -r -V "Ubuntu-$isoname" -b $Dest/cd/isolinux/isolinux.bin -c $Dest/cd/isolinux/boot.cat -cache-inodes -J -l -no-emul-boot -boot-load-size 4 -boot-info-table -o $Dest/Ubuntu-$isoname.iso .
-
-		cp $Dest/Ubuntu-$isoname.iso $HOME/
-	        clean
+		[ -f $Dest/cd/md5sum.txt ] && sudo rm $Dest/cd/md5sum.txt
+		cd $Dest/cd && sudo find -type f -print0 | sudo xargs -0 md5sum | grep -v isolinux/boot.cat | udo tee md5sum.txt
+		
+                makeiso
+		
+		finalize_Check=true
 		dialog --title "Thank you" --msgbox "The script is ended, you will find the new iso in:\n $HOME/Ubuntu-$isoname.iso" $hght $wdth
+	        clean
                 exit 0
 
 else updatemenu
